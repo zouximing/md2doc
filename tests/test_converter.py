@@ -293,10 +293,11 @@ def test_convert_batch_mirrors_output_structure(monkeypatch, tmp_path):
 
     out_dir = tmp_path / "build"
 
-    monkeypatch.setattr(
-        "md2doc.converter.convert_file",
-        lambda inp, outp, fmt, no_mermaid=False: Path(outp).write_bytes(b"OK"),
-    )
+    def fake_convert_file(input_file, output_file, fmt, no_mermaid=False):
+        Path(output_file).write_bytes(b"OK")
+        return Path(output_file)
+
+    monkeypatch.setattr("md2doc.converter.convert_file", fake_convert_file)
 
     successes, _ = converter.convert_batch(
         [a, b], out_dir, "docx", base_input_dir=base, no_mermaid=False
