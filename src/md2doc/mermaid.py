@@ -6,9 +6,11 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -93,6 +95,73 @@ _MMDC_INSTALL_HINT = (
     "  npm install -g @mermaid-js/mermaid-cli"
 )
 
+# 各平台 Chrome/Chromium 标准路径。用于绕过 puppeteer 自带 Chromium
+# 在某些 Windows 环境下的启动崩溃（STATUS_ACCESS_VIOLATION）。
+_CHROME_PATHS: dict[str, list[str]] = {
+    "win32": [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    ],
+    "darwin": [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ],
+}
+
+
+def _linux_chrome_candidates() -> list[str]:
+    """Linux 上 Chrome/Chromium 常见路径。"""
+    return [
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/snap/bin/chromium",
+    ]
+
+
+def _find_system_chrome() -> str | None:
+    """查找系统已安装的 Chrome/Chromium 可执行文件路径。
+
+    Returns:
+        找到的可执行文件绝对路径；找不到返回 None。
+    """
+    if sys.platform == "win32":
+        candidates: list[str] = list(_CHROME_PATHS.get("win32", []))
+    elif sys.platform == "darwin":
+        candidates = list(_CHROME_PATHS.get("darwin", []))
+    else:
+        candidates = _linux_chrome_candidates()
+    for path in candidates:
+        if Path(path).is_file():
+            return path
+    return None
+
+
+def _build_mmdc_env() -> dict[str, str] | None:
+    """构造传给 mmdc 的环境变量。
+
+    策略：
+    1. 用户已设 PUPPETEER_EXECUTABLE_PATH 环境变量 → 优先尊重，原样继承
+    2. 否则查找系统 Chrome，找到则注入到 env
+    3. 都没有 → 返回 None（让 subprocess 继承当前环境，由 mmdc 默认行为处理）
+
+    Returns:
+        env dict（含 PUPPETEER_EXECUTABLE_PATH）或 None。
+    """
+    env = dict(os.environ)
+    if env.get("PUPPETEER_EXECUTABLE_PATH"):
+        return env
+    chrome = _find_system_chrome()
+    if chrome is not None:
+        env["PUPPETEER_EXECUTABLE_PATH"] = chrome
+        return env
+    return None
+
 
 def ensure_mmdc() -> str:
     """返回 mmdc 可执行路径。未安装则抛 MmdcNotFoundError。"""
@@ -127,6 +196,8 @@ def render_all(blocks: list[MermaidBlock], out_dir: Path) -> list[Path]:
     mmdc_path = ensure_mmdc()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    # 注入 Chrome 路径，避免 puppeteer 自带 Chromium 在某些环境下崩溃
+    env = _build_mmdc_env()
 
     image_paths: list[Path] = []
     for block in blocks:
@@ -141,7 +212,12 @@ def render_all(blocks: list[MermaidBlock], out_dir: Path) -> list[Path]:
             "--scale", "2",
         ]
         result = subprocess.run(
-            args, capture_output=True, text=True, check=False, timeout=180
+            args,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=180,
+            env=env,
         )
         if result.returncode != 0:
             detail = (result.stderr + result.stdout).strip()

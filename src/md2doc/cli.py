@@ -3,7 +3,18 @@
 参数解析（click）+ 输出格式化（rich）。业务逻辑全部委托给 converter 模块。
 """
 
+import sys
 from pathlib import Path
+
+# Windows 中文终端默认 GBK 编码，rich 输出含 Unicode 符号（✓✗⚠）时
+# legacy_windows_renderer 会触发 UnicodeEncodeError，掩盖真正的错误信息。
+# 在 import rich 之前把 stdout/stderr 重配为 UTF-8（errors='replace' 兜底）。
+if sys.platform == "win32":
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except (AttributeError, OSError):
+            pass
 
 import click
 from rich.console import Console

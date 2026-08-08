@@ -262,3 +262,101 @@ def test_preprocess_replaces_blocks_with_images(monkeypatch, tmp_path):
     assert "```mermaid" not in result
     assert ".png" in result
     assert "前缀" in result and "后缀" in result
+
+
+# --- Chrome 自动检测（避免 puppeteer 自带 Chromium 在 Windows 崩溃） ---
+
+
+def test_find_system_chrome_returns_existing_path(monkeypatch, tmp_path):
+    """存在的 Chrome 路径被返回。"""
+    fake_chrome = tmp_path / "chrome.exe"
+    fake_chrome.write_bytes(b"FAKE")
+    monkeypatch.setattr("md2doc.mermaid.sys.platform", "win32")
+    monkeypatch.setattr(
+        "md2doc.mermaid._CHROME_PATHS",
+        {"win32": [str(fake_chrome)], "darwin": []},
+    )
+    assert mermaid._find_system_chrome() == str(fake_chrome)
+
+
+def test_find_system_chrome_returns_none_when_not_found(monkeypatch):
+    """所有候选路径都不存在时返回 None。"""
+    monkeypatch.setattr("md2doc.mermaid.sys.platform", "win32")
+    monkeypatch.setattr(
+        "md2doc.mermaid._CHROME_PATHS",
+        {"win32": ["/nonexistent/chrome.exe"], "darwin": []},
+    )
+    assert mermaid._find_system_chrome() is None
+
+
+def test_build_mmdc_env_returns_none_when_nothing_available(monkeypatch):
+    """既无环境变量，也未找到系统 Chrome 时返回 None（让 subprocess 用默认环境）。"""
+    monkeypatch.delenv("PUPPETEER_EXECUTABLE_PATH", raising=False)
+    monkeypatch.setattr("md2doc.mermaid._find_system_chrome", lambda: None)
+    assert mermaid._build_mmdc_env() is None
+
+
+def test_build_mmdc_env_uses_existing_env_var(monkeypatch):
+    """用户已设 PUPPETEER_EXECUTABLE_PATH 时优先使用，不调用 Chrome 检测。"""
+    monkeypatch.setenv("PUPPETEER_EXECUTABLE_PATH", "/custom/chrome")
+    monkeypatch.setattr("md2doc.mermaid._find_system_chrome", lambda: None)
+    env = mermaid._build_mmdc_env()
+    assert env is not None
+    assert env["PUPPETEER_EXECUTABLE_PATH"] == "/custom/chrome"
+
+
+def test_build_mmdc_env_auto_detects_chrome(monkeypatch):
+    """无环境变量但找到系统 Chrome 时，自动设置 env。"""
+    monkeypatch.delenv("PUPPETEER_EXECUTABLE_PATH", raising=False)
+    monkeypatch.setattr("md2doc.mermaid._find_system_chrome", lambda: "/auto/chrome")
+    env = mermaid._build_mmdc_env()
+    assert env is not None
+    assert env["PUPPETEER_EXECUTABLE_PATH"] == "/auto/chrome"
+
+
+def test_render_all_passes_chrome_env_to_subprocess(monkeypatch, tmp_path):
+    """render_all 把 env 透传给 subprocess.run。"""
+    captured_envs = []
+
+    def fake_run(args, **kwargs):
+        captured_envs.append(kwargs.get("env"))
+        out_idx = args.index("-o")
+        Path(args[out_idx + 1]).write_bytes(b"PNG")
+        return subprocess.CompletedProcess(
+            args=args, returncode=0, stdout="", stderr=""
+        )
+
+    monkeypatch.setattr("md2doc.mermaid.shutil.which", lambda name: "/usr/local/bin/mmdc")
+    monkeypatch.setattr("md2doc.mermaid.subprocess.run", fake_run)
+    monkeypatch.delenv("PUPPETEER_EXECUTABLE_PATH", raising=False)
+    monkeypatch.setattr("md2doc.mermaid._find_system_chrome", lambda: "/auto/chrome")
+
+    blocks = [MermaidBlock(id="mermaid_0", code="graph TD", start=0, end=0)]
+    mermaid.render_all(blocks, tmp_path)
+
+    assert len(captured_envs) == 1
+    assert captured_envs[0] is not None
+    assert captured_envs[0]["PUPPETEER_EXECUTABLE_PATH"] == "/auto/chrome"
+
+
+def test_render_all_env_none_when_no_chrome(monkeypatch, tmp_path):
+    """无 Chrome 时 env 为 None，subprocess 继承当前环境。"""
+    captured_envs = []
+
+    def fake_run(args, **kwargs):
+        captured_envs.append(kwargs.get("env"))
+        out_idx = args.index("-o")
+        Path(args[out_idx + 1]).write_bytes(b"PNG")
+        return subprocess.CompletedProcess(
+            args=args, returncode=0, stdout="", stderr=""
+        )
+
+    monkeypatch.setattr("md2doc.mermaid.shutil.which", lambda name: "/usr/local/bin/mmdc")
+    monkeypatch.setattr("md2doc.mermaid.subprocess.run", fake_run)
+    monkeypatch.delenv("PUPPETEER_EXECUTABLE_PATH", raising=False)
+    monkeypatch.setattr("md2doc.mermaid._find_system_chrome", lambda: None)
+
+    blocks = [MermaidBlock(id="mermaid_0", code="graph TD", start=0, end=0)]
+    mermaid.render_all(blocks, tmp_path)
+
+    assert captured_envs[0] is None
