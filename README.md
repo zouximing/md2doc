@@ -90,8 +90,10 @@ md2doc 还提供 Web 界面，支持浏览器上传 / 在线编辑 / 实时预�
 
 ```bash
 pip install -e ".[web]"        # 安装 FastAPI/uvicorn 等额外依赖
-md2doc-web                      # 默认监听 0.0.0.0:8000
-# 或自定义：
+md2doc-web                      # 默认监听 127.0.0.1:8000（仅本机访问）
+# 暴露到内网（多人共用）：
+md2doc-web --host 0.0.0.0 --port 8000
+# 或自定义端口：
 md2doc-web --host 127.0.0.1 --port 9000
 ```
 
