@@ -129,3 +129,22 @@ def test_no_input_shows_help_exit_code_2(runner):
     """无任何参数时显示帮助，退出码 2。"""
     result = runner.invoke(cli.main, [])
     assert result.exit_code == 2
+
+
+def test_batch_dependency_missing_returns_exit_code_3(runner, tmp_path, monkeypatch):
+    """批量模式下 pandoc 未装导致所有文件失败时，退出码应为 3（而非 4）。"""
+    from md2doc.errors import PandocNotFoundError
+    base = tmp_path / "docs"
+    base.mkdir()
+    a = base / "a.md"
+    a.write_text("# A", encoding="utf-8")
+
+    out_dir = tmp_path / "build"
+
+    def fail(*args, **kwargs):
+        raise PandocNotFoundError("pandoc 未装")
+
+    monkeypatch.setattr("md2doc.cli.converter.convert_file", fail)
+
+    result = runner.invoke(cli.main, [str(base), "-o", str(out_dir)])
+    assert result.exit_code == 3
