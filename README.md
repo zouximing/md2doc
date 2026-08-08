@@ -81,3 +81,31 @@ md2doc 会自动把所有 mermaid 块渲染为 PNG 并嵌入输出文档。
 **报错"未找到 mmdc"：** 你的 Markdown 含 mermaid 图，需要额外安装 `npm install -g @mermaid-js/mermaid-cli`。若明知文档无图却报此错，请用 `--no-mermaid` 跳过预处理。
 
 **输出目录会被自动创建吗？** 批量模式（输入是目录）下，`-o` 指向不存在的目录会自动创建。
+
+## Web 界面
+
+md2doc 还提供 Web 界面，支持浏览器上传 / 在线编辑 / 实时预览 / 下载 .docx。
+
+### 启动
+
+```bash
+pip install -e ".[web]"        # 安装 FastAPI/uvicorn 等额外依赖
+md2doc-web                      # 默认监听 0.0.0.0:8000
+# 或自定义：
+md2doc-web --host 127.0.0.1 --port 9000
+```
+
+打开浏览器访问 `http://localhost:8000`。
+
+### 使用
+
+- **上传 .md**：点击"上传 .md"按钮选择本地 markdown 文件，内容加载到编辑框
+- **在线编辑**：在左侧 CodeMirror 编辑器中输入 markdown，右侧预览区约 600ms 后自动更新
+- **下载 .docx**：点击"下载 .docx"按钮，浏览器下载转换后的 Word 文档
+
+### 注意事项
+
+- 预览路径**跳过** mermaid 渲染（含 mermaid 的代码块会显示"下载时才会渲染"提示），下载 .docx 时才会调用 mmdc 渲染
+- 内网多人共用部署，无认证；公网部署请自行加反向代理 + 认证
+- CodeMirror 通过 `esm.sh` CDN 加载，离线内网环境需提前镜像或改本地静态文件
+- 文本/文件上限 10MB
