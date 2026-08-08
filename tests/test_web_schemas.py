@@ -87,12 +87,19 @@ def test_sanitize_no_extension():
     assert sanitize_filename("report") == "report"
 
 
-def test_sanitize_strips_path_separators():
-    # 防止路径遍历：Path 会把 .. 解析为父目录组件，
-    # Path("../evil.md").name == "evil.md"，stem == "evil"，
-    # 因此 sanitize 后返回 "evil"（无路径分隔符可替换）。
+def test_sanitize_path_traversal_input():
+    # pathlib 把 .. / 分隔符自动解析，stem 不含路径组件
     assert sanitize_filename("../evil.md") == "evil"
     assert sanitize_filename("..\\evil.md") == "evil"
+
+
+def test_sanitize_neutralizes_crlf_injection():
+    # Content-Disposition header 注入防御：CRLF 必须被替换为下划线
+    result = sanitize_filename("a\r\nb.md")
+    assert result is not None
+    assert "\r" not in result
+    assert "\n" not in result
+    assert result == "a__b"
 
 
 def test_sanitize_strips_special_chars():
