@@ -1,12 +1,11 @@
 import subprocess
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 from md2doc import mermaid
 from md2doc.errors import ConversionError, MmdcNotFoundError
 from md2doc.mermaid import MermaidBlock
-
 
 # --- has_mermaid ---
 

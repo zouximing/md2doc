@@ -1,7 +1,8 @@
-import pytest
 from pathlib import Path
-from md2doc import converter
 
+import pytest
+
+from md2doc import converter
 
 # --- scan_md_files ---
 

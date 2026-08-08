@@ -1,6 +1,8 @@
-import pytest
 from pathlib import Path
+
+import pytest
 from click.testing import CliRunner
+
 from md2doc import cli
 
 

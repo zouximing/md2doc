@@ -9,7 +9,7 @@ import click
 from rich.console import Console
 
 from md2doc import __version__, converter, mermaid, pandoc
-from md2doc.errors import DependencyNotFoundError, InvalidInputError, Md2docError
+from md2doc.errors import DependencyNotFoundError, Md2docError
 
 _console = Console()
 
@@ -62,7 +62,7 @@ def main(input, output, fmt, recursive, no_mermaid, show_version):
     except Md2docError as exc:
         _console.print(f"[red]✗ {exc}[/red]")
         raise SystemExit(exc.exit_code)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _console.print(f"[red]✗ 未预期的错误：{exc}[/red]")
         raise SystemExit(4)
 

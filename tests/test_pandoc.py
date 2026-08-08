@@ -1,8 +1,9 @@
 import subprocess
-import pytest
-from md2doc import pandoc
-from md2doc.errors import PandocNotFoundError, ConversionError
 
+import pytest
+
+from md2doc import pandoc
+from md2doc.errors import ConversionError, PandocNotFoundError
 
 # --- 检测 ---
 
