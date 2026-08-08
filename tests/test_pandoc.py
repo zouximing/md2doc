@@ -48,6 +48,18 @@ def test_get_version_when_not_installed_returns_none(monkeypatch):
     assert pandoc.get_version() is None
 
 
+def test_get_version_returns_none_when_output_unparseable(monkeypatch):
+    """pandoc 已装但 --version 输出无法匹配正则时返回 None。"""
+    monkeypatch.setattr("md2doc.pandoc.shutil.which", lambda name: "/usr/bin/pandoc")
+    monkeypatch.setattr(
+        "md2doc.pandoc.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout="完全不含版本号的异常输出\n", stderr=""
+        ),
+    )
+    assert pandoc.get_version() is None
+
+
 # --- 转换 ---
 
 def test_convert_constructs_correct_command(monkeypatch, tmp_path):

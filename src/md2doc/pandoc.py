@@ -3,9 +3,12 @@
 这是项目中唯一与 pandoc 交互的模块，便于测试时 mock。
 """
 
+from __future__ import annotations
+
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 from md2doc.errors import ConversionError, PandocNotFoundError
 
@@ -37,7 +40,7 @@ def get_version() -> str | None:
     return match.group(1) if match else None
 
 
-def convert(input_path, output_path, fmt: str) -> None:
+def convert(input_path: str | Path, output_path: str | Path, fmt: str) -> None:
     """调用 pandoc 把 input_path 转为 fmt 格式，输出到 output_path。
 
     Args:
