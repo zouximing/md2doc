@@ -61,7 +61,9 @@ def convert(input_path: str | Path, output_path: str | Path, fmt: str) -> None:
         "--from=markdown",
         f"--to={fmt}",
     ]
-    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        args, capture_output=True, text=True, check=False, timeout=120
+    )
     if result.returncode != 0:
         raise ConversionError(
             f"pandoc 转换失败（退出码 {result.returncode}）：\n{result.stderr.strip()}"

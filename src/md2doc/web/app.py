@@ -77,7 +77,11 @@ async def upload(file: UploadFile) -> UploadResponse:
     if not filename.lower().endswith(".md"):
         raise WebError(UNSUPPORTED_TYPE, "仅支持 .md 文件", 415)
 
-    content = await file.read()
+    try:
+        content = await file.read()
+    except OSError as exc:
+        raise WebError(INVALID_INPUT, f"文件读取失败：{exc}", 400) from exc
+
     if len(content) > MAX_BODY_BYTES:
         raise WebError(FILE_TOO_LARGE, "文件超过 10MB", 413)
 
@@ -131,7 +135,9 @@ async def convert(req: ConvertRequest) -> Response:
 def main() -> None:
     """md2doc-web CLI 入口：启动 uvicorn 服务。"""
     parser = argparse.ArgumentParser(prog="md2doc-web")
-    parser.add_argument("--host", default="0.0.0.0", help="监听地址")
+    parser.add_argument(
+        "--host", default="127.0.0.1", help="监听地址（默认仅本机访问）"
+    )
     parser.add_argument("--port", type=int, default=8000, help="监听端口")
     parser.add_argument("--reload", action="store_true", help="代码热重载（开发用）")
     args = parser.parse_args()

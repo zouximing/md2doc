@@ -258,3 +258,30 @@ def test_convert_no_filename_uses_default(client, monkeypatch):
     response = client.post("/api/convert", json={"text": "x"})
     assert response.status_code == 200
     assert '"document.docx"' in response.headers["content-disposition"]
+
+
+# --- INTERNAL 兜底路径 ---
+
+
+def test_preview_internal_error_returns_500(client, monkeypatch):
+    """未预期异常返回 500 INTERNAL。"""
+    def raise_runtime(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("md2doc.web.app.pandoc.convert", raise_runtime)
+
+    response = client.post("/api/preview", json={"text": "hi"})
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL"
+
+
+def test_convert_internal_error_returns_500(client, monkeypatch):
+    """未预期异常返回 500 INTERNAL。"""
+    def raise_runtime(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("md2doc.web.app.converter.convert_file", raise_runtime)
+
+    response = client.post("/api/convert", json={"text": "hi"})
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL"
