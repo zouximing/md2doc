@@ -72,6 +72,10 @@ def replace_blocks(
     """
     if not blocks:
         return md
+    if len(blocks) != len(image_paths):
+        raise ValueError(
+            f"blocks 与 image_paths 长度不一致（{len(blocks)} != {len(image_paths)}）"
+        )
     # 按位置从后往前替换，避免位置偏移
     # 注意：调用方负责传绝对路径（见 render_all 的输出）
     sorted_items = sorted(
@@ -103,7 +107,7 @@ def get_version() -> str | None:
     if shutil.which("mmdc") is None:
         return None
     result = subprocess.run(
-        ["mmdc", "--version"], capture_output=True, text=True, check=False
+        ["mmdc", "--version"], capture_output=True, text=True, check=False, timeout=30
     )
     return result.stdout.strip() or None
 
@@ -136,10 +140,13 @@ def render_all(blocks: list[MermaidBlock], out_dir: Path) -> list[Path]:
             "-o", str(png_file),
             "--scale", "2",
         ]
-        result = subprocess.run(args, capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            args, capture_output=True, text=True, check=False, timeout=180
+        )
         if result.returncode != 0:
+            detail = (result.stderr + result.stdout).strip()
             raise ConversionError(
-                f"mermaid 渲染失败（块 {block.id}）：\n{result.stderr.strip()}"
+                f"mermaid 渲染失败（块 {block.id}）：\n{detail}"
             )
         image_paths.append(png_file)
     return image_paths
