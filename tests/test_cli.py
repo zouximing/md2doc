@@ -148,3 +148,28 @@ def test_batch_dependency_missing_returns_exit_code_3(runner, tmp_path, monkeypa
 
     result = runner.invoke(cli.main, [str(base), "-o", str(out_dir)])
     assert result.exit_code == 3
+
+
+# --- 集成测试（需要真实 pandoc + mmdc，默认跳过） ---
+
+@pytest.mark.integration
+def test_end_to_end_simple_md_to_docx(runner, tmp_path):
+    """端到端：真实调用 pandoc 转换一个简单 MD。"""
+    src = tmp_path / "in.md"
+    src.write_text("# 你好\n\n这是一段测试文本。", encoding="utf-8")
+    out = tmp_path / "out.docx"
+    result = runner.invoke(cli.main, [str(src), "-o", str(out)])
+    assert result.exit_code == 0
+    assert out.exists()
+    assert out.stat().st_size > 0
+
+
+@pytest.mark.integration
+def test_end_to_end_with_mermaid(runner, tmp_path):
+    """端到端：含 mermaid 的 MD 转 .docx。"""
+    fixture = Path(__file__).parent / "fixtures" / "with_mermaid.md"
+    out = tmp_path / "out.docx"
+    result = runner.invoke(cli.main, [str(fixture), "-o", str(out)])
+    assert result.exit_code == 0
+    assert out.exists()
+    assert out.stat().st_size > 0

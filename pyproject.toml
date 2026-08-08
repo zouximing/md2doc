@@ -28,6 +28,10 @@ packages = ["src/md2doc"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "integration: 端到端集成测试（需要真实 pandoc/mmdc，默认跳过）",
+]
+addopts = "-m 'not integration'"
 
 [tool.ruff]
 line-length = 100
