@@ -1,4 +1,3 @@
-import pytest
 from md2doc.errors import (
     Md2docError,
     InvalidInputError,
