@@ -17,10 +17,17 @@ dev = [
     "pytest>=8.0",
     "pytest-cov",
     "ruff",
+    "httpx>=0.27",
+]
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "python-multipart>=0.0.9",
 ]
 
 [project.scripts]
 md2doc = "md2doc.cli:main"
+md2doc-web = "md2doc.web.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/md2doc"]
