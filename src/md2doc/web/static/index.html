@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>md2doc-web</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="toolbar">
+    <label class="upload-btn">
+      上传 .md
+      <input type="file" id="file-input" accept=".md,.MD" hidden>
+    </label>
+    <span id="filename-label" class="filename-label">（未上传）</span>
+    <button id="download-btn" class="download-btn">下载 .docx</button>
+  </header>
+  <div id="toast" class="toast hidden"></div>
+  <main class="panes">
+    <div id="editor" class="pane editor-pane"></div>
+    <div id="preview" class="pane preview-pane">
+      <div class="loading-dot hidden" id="preview-loading"></div>
+    </div>
+  </main>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

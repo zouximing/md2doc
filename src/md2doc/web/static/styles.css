@@ -1,0 +1,62 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; font-family: system-ui, sans-serif; }
+
+body { display: flex; flex-direction: column; height: 100vh; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; background: #f4f4f5; border-bottom: 1px solid #d4d4d8;
+  flex: 0 0 auto;
+}
+.upload-btn {
+  display: inline-block; padding: 6px 14px; background: #2563eb; color: #fff;
+  border-radius: 4px; cursor: pointer; font-size: 14px;
+}
+.upload-btn:hover { background: #1d4ed8; }
+.filename-label { color: #52525b; font-size: 14px; flex: 1; }
+.download-btn {
+  padding: 6px 14px; background: #16a34a; color: #fff; border: none;
+  border-radius: 4px; cursor: pointer; font-size: 14px;
+}
+.download-btn:hover { background: #15803d; }
+.download-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+
+.panes {
+  flex: 1 1 auto; display: flex; min-height: 0;
+}
+.pane {
+  flex: 1 1 50%; min-width: 0; overflow: auto;
+}
+.editor-pane { border-right: 1px solid #d4d4d8; }
+.preview-pane {
+  padding: 16px 24px; line-height: 1.6; color: #18181b;
+  position: relative;
+}
+.preview-pane .mermaid-hint {
+  background: #fef3c7; color: #92400e; padding: 6px 10px;
+  border-left: 3px solid #f59e0b; margin: 8px 0; font-size: 13px;
+}
+
+.loading-dot {
+  position: absolute; top: 10px; right: 14px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #3b82f6; animation: pulse 1s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+.toast {
+  margin: 0 auto; max-width: 600px; padding: 10px 16px;
+  background: #fee2e2; color: #991b1b; border-radius: 4px;
+  font-size: 14px; text-align: center;
+}
+.toast.hidden { display: none; }
+
+/* CodeMirror 占满编辑器区域 */
+.editor-pane .cm-editor { height: 100%; }
+.editor-pane .cm-scroller { overflow: auto; }
+
+/* 小屏纵向堆叠 */
+@media (max-width: 800px) {
+  .panes { flex-direction: column; }
+  .pane { flex: 1 1 auto; }
+}

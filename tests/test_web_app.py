@@ -32,10 +32,13 @@ def _fake_pandoc_convert_writes_docx(input_path, output_path, fmt):
 # --- GET / ---
 
 
-def test_index_returns_placeholder(client):
-    """GET / 返回 200。Task 1 阶段为 JSON 占位，Task 4 改为 HTML。"""
+def test_index_returns_html(client):
+    """GET / 返回 HTML 单页（含编辑器占位元素）。"""
     response = client.get("/")
     assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "<div id=\"editor\"" in response.text
+    assert "<div id=\"preview\"" in response.text
 
 
 # --- POST /api/upload ---

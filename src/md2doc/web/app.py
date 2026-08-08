@@ -13,7 +13,8 @@ from typing import Callable
 
 import uvicorn
 from fastapi import FastAPI, UploadFile
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from md2doc import converter, mermaid, pandoc  # noqa: F401 — mermaid 作为 mock 锚点
 from md2doc.errors import ConversionError, DependencyNotFoundError
@@ -36,6 +37,11 @@ from md2doc.web.schemas import (
 )
 
 app = FastAPI(title="md2doc-web", version="0.1.0")
+
+_STATIC_DIR = Path(__file__).parent / "static"
+
+if _STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 
 @app.exception_handler(WebError)
@@ -65,9 +71,9 @@ async def _run_blocking(func: Callable[[], object]) -> object:
 
 
 @app.get("/")
-def index() -> dict:
-    """占位响应；Task 4 替换为静态单页 HTML。"""
-    return {"name": "md2doc-web"}
+def index() -> FileResponse:
+    """返回单页 HTML。"""
+    return FileResponse(_STATIC_DIR / "index.html", media_type="text/html")
 
 
 @app.post("/api/upload", response_model=UploadResponse)
