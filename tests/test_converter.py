@@ -148,3 +148,21 @@ def test_batch_output_nonexistent_dir_is_created(tmp_path):
     assert result == out_dir / "a.docx"
     # 确保目录被创建
     assert result.parent.exists()
+
+
+def test_batch_input_file_outside_base_dir_raises(tmp_path):
+    """input_file 不在 base_input_dir 下时抛 InvalidInputError（而非原始 ValueError）。"""
+    from md2doc.errors import InvalidInputError
+    base = tmp_path / "docs"
+    base.mkdir()
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    src = outside / "a.md"
+    src.write_text("# A", encoding="utf-8")
+
+    out_dir = tmp_path / "build"
+    out_dir.mkdir()
+    with pytest.raises(InvalidInputError):
+        converter.resolve_output_path(
+            src, out_dir, "docx", is_batch=True, base_input_dir=base
+        )

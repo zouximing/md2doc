@@ -109,11 +109,18 @@ def _resolve_batch_output(
         )
 
     # 计算相对路径（用于镜像）
+    # 注意：base_input_dir=None 时回退到 input_file.parent，仅适用于 input_file
+    # 直接位于根目录的情况；正常调用方（cli.py）应总是传入正确的 base_input_dir
     if base_input_dir is None:
         base_input_dir = input_file.parent
     base_input_dir = Path(base_input_dir)
 
-    rel = input_file.relative_to(base_input_dir)
+    try:
+        rel = input_file.relative_to(base_input_dir)
+    except ValueError:
+        raise InvalidInputError(
+            f"输入文件 {input_file} 不在基础目录 {base_input_dir} 下"
+        ) from None
     rel_output = rel.with_suffix(f".{fmt}")
 
     # 如果 output 不存在，自动创建
