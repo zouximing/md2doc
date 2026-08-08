@@ -7,8 +7,12 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+from md2doc.errors import ConversionError, MmdcNotFoundError
 
 # 匹配 ```mermaid 和 ~~~mermaid 两种围栏，大小写不敏感
 _PATTERN = re.compile(
@@ -48,3 +52,115 @@ def extract_blocks(md: str) -> list[MermaidBlock]:
             )
         )
     return blocks
+
+
+def replace_blocks(
+    md: str, blocks: list[MermaidBlock], image_paths: list[Path]
+) -> str:
+    """把 md 中的 mermaid 代码块替换为图片引用。
+
+    按 start 位置从后往前替换，避免位置偏移。
+    image_paths 顺序需与 blocks 顺序一致。
+
+    Args:
+        md: 原始 Markdown 文本。
+        blocks: extract_blocks 的返回值。
+        image_paths: 每个块对应的渲染后 PNG 绝对路径。
+
+    Returns:
+        替换后的 Markdown 文本。
+    """
+    if not blocks:
+        return md
+    # 按位置从后往前替换，避免位置偏移
+    # 注意：调用方负责传绝对路径（见 render_all 的输出）
+    sorted_items = sorted(
+        zip(blocks, image_paths), key=lambda x: x[0].start, reverse=True
+    )
+    result = md
+    for block, image_path in sorted_items:
+        replacement = f"![图]({image_path.as_posix()})"
+        result = result[: block.start] + replacement + result[block.end:]
+    return result
+
+
+_MMDC_INSTALL_HINT = (
+    "未找到 mmdc（mermaid-cli）。请安装：\n"
+    "  npm install -g @mermaid-js/mermaid-cli"
+)
+
+
+def ensure_mmdc() -> str:
+    """返回 mmdc 可执行路径。未安装则抛 MmdcNotFoundError。"""
+    path = shutil.which("mmdc")
+    if path is None:
+        raise MmdcNotFoundError(_MMDC_INSTALL_HINT)
+    return path
+
+
+def get_version() -> str | None:
+    """返回 mmdc 版本号字符串。未安装返回 None。"""
+    if shutil.which("mmdc") is None:
+        return None
+    result = subprocess.run(
+        ["mmdc", "--version"], capture_output=True, text=True, check=False
+    )
+    return result.stdout.strip() or None
+
+
+def render_all(blocks: list[MermaidBlock], out_dir: Path) -> list[Path]:
+    """把所有 mermaid 块渲染为 PNG 图片。
+
+    为每个块在 out_dir 中写一个 .mmd 源文件，调用 mmdc 渲染为 PNG。
+    返回值：每个块对应的 PNG 路径列表（顺序与 blocks 一致）。
+
+    Raises:
+        MmdcNotFoundError: mmdc 未安装。
+        ConversionError: 某个块的渲染失败（错误信息含块 ID 和 mmdc 输出）。
+    """
+    if not blocks:
+        return []
+    mmdc_path = ensure_mmdc()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    image_paths: list[Path] = []
+    for block in blocks:
+        mmd_file = out_dir / f"{block.id}.mmd"
+        png_file = out_dir / f"{block.id}.png"
+        mmd_file.write_text(block.code, encoding="utf-8")
+
+        args = [
+            mmdc_path,
+            "-i", str(mmd_file),
+            "-o", str(png_file),
+            "--scale", "2",
+        ]
+        result = subprocess.run(args, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            raise ConversionError(
+                f"mermaid 渲染失败（块 {block.id}）：\n{result.stderr.strip()}"
+            )
+        image_paths.append(png_file)
+    return image_paths
+
+
+def preprocess(md: str, work_dir: Path) -> str:
+    """高层封装：如果 md 含 mermaid，提取->渲染->替换；否则原样返回。
+
+    Args:
+        md: 原始 Markdown 文本。
+        work_dir: 用于存放中间 .mmd 和 .png 文件的目录。
+
+    Returns:
+        处理后的 Markdown 文本。若无 mermaid 块则与输入相同。
+
+    Raises:
+        MmdcNotFoundError: md 含 mermaid 但 mmdc 未安装。
+        ConversionError: 某个 mermaid 块渲染失败。
+    """
+    if not has_mermaid(md):
+        return md
+    blocks = extract_blocks(md)
+    image_paths = render_all(blocks, Path(work_dir))
+    return replace_blocks(md, blocks, image_paths)
