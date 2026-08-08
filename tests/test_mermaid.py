@@ -58,8 +58,11 @@ def test_extract_blocks_sets_span_positions():
     md = "前缀\n```mermaid\ngraph TD\nA-->B\n```\n后缀"
     blocks = mermaid.extract_blocks(md)
     assert len(blocks) == 1
-    # 验证 start/end 指向代码块在 md 中的位置
-    assert md[blocks[0].start:blocks[0].end].startswith("```mermaid")
+    # 验证 start/end 精确覆盖整个围栏块（含开闭围栏）
+    span = md[blocks[0].start:blocks[0].end]
+    assert span.startswith("```mermaid")
+    assert span.endswith("```")
+    assert "graph TD" in span
 
 
 def test_extract_blocks_does_not_match_python_blocks():
