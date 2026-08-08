@@ -6,8 +6,10 @@
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
+from md2doc import mermaid, pandoc
 from md2doc.errors import InvalidInputError
 
 
@@ -130,3 +132,84 @@ def _resolve_batch_output(
     final = output / rel_output
     final.parent.mkdir(parents=True, exist_ok=True)
     return final
+
+
+def convert_file(
+    input_file: Path,
+    output_file: Path,
+    fmt: str,
+    no_mermaid: bool = False,
+) -> Path:
+    """转换单个 .md 文件到目标格式。
+
+    流程：读源 MD -> mermaid 预处理（除非 no_mermaid）-> 写临时 .md -> pandoc 转换 -> 输出。
+
+    Args:
+        input_file: 输入 .md 文件路径。
+        output_file: 输出文件路径。
+        fmt: 目标格式（如 'docx'）。
+        no_mermaid: True 则跳过 mermaid 预处理。
+
+    Returns:
+        输出文件路径。
+
+    Raises:
+        MmdcNotFoundError: MD 含 mermaid 但 mmdc 未装（由 mermaid.preprocess 抛出）。
+        ConversionError: pandoc 或 mmdc 执行失败。
+    """
+    input_file = Path(input_file)
+    md = input_file.read_text(encoding="utf-8")
+
+    # 预处理在临时目录中进行，不污染源文件所在目录
+    with tempfile.TemporaryDirectory(prefix="md2doc_") as tmpdir:
+        if no_mermaid:
+            processed = md
+        else:
+            processed = mermaid.preprocess(md, Path(tmpdir))
+
+        # 写入临时 .md 文件交给 pandoc
+        staged = Path(tmpdir) / "_staged.md"
+        staged.write_text(processed, encoding="utf-8")
+        pandoc.convert(staged, output_file, fmt)
+
+    return Path(output_file)
+
+
+def convert_batch(
+    input_files: list[Path],
+    output_dir: Path,
+    fmt: str,
+    base_input_dir: Path,
+    no_mermaid: bool = False,
+) -> tuple[list[Path], list[tuple[Path, Exception]]]:
+    """批量转换多个 .md 文件。
+
+    单个文件失败不阻塞其余文件。输出在 output_dir 下镜像源目录结构。
+
+    Args:
+        input_files: 输入 .md 文件路径列表。
+        output_dir: 输出根目录。
+        fmt: 目标格式。
+        base_input_dir: 输入根目录，用于计算相对路径。
+        no_mermaid: 是否跳过 mermaid 预处理。
+
+    Returns:
+        (成功列表, 失败列表)。
+        成功列表：转换成功的输出文件路径列表。
+        失败列表：[(输入文件路径, 异常对象), ...]。
+    """
+    successes: list[Path] = []
+    failures: list[tuple[Path, Exception]] = []
+
+    for input_file in input_files:
+        try:
+            output_file = resolve_output_path(
+                input_file, output_dir, fmt,
+                is_batch=True, base_input_dir=base_input_dir,
+            )
+            convert_file(input_file, output_file, fmt, no_mermaid=no_mermaid)
+            successes.append(output_file)
+        except Exception as exc:  # noqa: BLE001 - 批量模式需捕获一切以继续
+            failures.append((input_file, exc))
+
+    return successes, failures
