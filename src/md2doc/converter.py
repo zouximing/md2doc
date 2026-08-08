@@ -207,8 +207,10 @@ def convert_batch(
                 input_file, output_dir, fmt,
                 is_batch=True, base_input_dir=base_input_dir,
             )
-            convert_file(input_file, output_file, fmt, no_mermaid=no_mermaid)
-            successes.append(output_file)
+            actual_output = convert_file(
+                input_file, output_file, fmt, no_mermaid=no_mermaid
+            )
+            successes.append(actual_output)
         except Exception as exc:  # noqa: BLE001 - 批量模式需捕获一切以继续
             failures.append((input_file, exc))
 
