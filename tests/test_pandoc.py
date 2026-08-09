@@ -112,3 +112,81 @@ def test_convert_raises_when_pandoc_not_installed(monkeypatch, tmp_path):
     input_md.write_text("# Hello", encoding="utf-8")
     with pytest.raises(PandocNotFoundError):
         pandoc.convert(input_md, tmp_path / "out.docx", "docx")
+
+
+def test_convert_with_reference_doc_and_lua_filter_and_numbering(monkeypatch, tmp_path):
+    """三个 styled 参数全部传入时，args 应包含对应的 pandoc 选项。"""
+    captured = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("md2doc.pandoc.shutil.which", lambda name: "/usr/bin/pandoc")
+    monkeypatch.setattr("md2doc.pandoc.subprocess.run", fake_run)
+
+    ref = tmp_path / "ref.docx"
+    ref.write_bytes(b"")
+    lua = tmp_path / "cap.lua"
+    lua.write_text("--", encoding="utf-8")
+    input_md = tmp_path / "in.md"
+    input_md.write_text("# hi", encoding="utf-8")
+
+    pandoc.convert(
+        input_md,
+        tmp_path / "out.docx",
+        "docx",
+        reference_doc=ref,
+        lua_filter=lua,
+        number_sections=True,
+    )
+
+    assert f"--reference-doc={ref}" in captured["args"]
+    assert f"--lua-filter={lua}" in captured["args"]
+    assert "--number-sections" in captured["args"]
+
+
+def test_convert_with_no_styled_options_matches_legacy_args(monkeypatch, tmp_path):
+    """三个参数都不传时，args 应当与旧调用完全一致（向后兼容）。"""
+    captured = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = list(args)
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("md2doc.pandoc.shutil.which", lambda name: "/usr/bin/pandoc")
+    monkeypatch.setattr("md2doc.pandoc.subprocess.run", fake_run)
+
+    input_md = tmp_path / "in.md"
+    input_md.write_text("# hi", encoding="utf-8")
+    pandoc.convert(input_md, tmp_path / "out.docx", "docx")
+
+    expected = [
+        "/usr/bin/pandoc",
+        str(input_md),
+        "-o",
+        str(tmp_path / "out.docx"),
+        "--from=markdown",
+        "--to=docx",
+    ]
+    assert captured["args"] == expected
+
+
+def test_convert_partial_styled_options(monkeypatch, tmp_path):
+    """只传 number_sections 时，args 不应含 reference-doc / lua-filter。"""
+    captured = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("md2doc.pandoc.shutil.which", lambda name: "/usr/bin/pandoc")
+    monkeypatch.setattr("md2doc.pandoc.subprocess.run", fake_run)
+
+    input_md = tmp_path / "in.md"
+    input_md.write_text("# hi", encoding="utf-8")
+    pandoc.convert(input_md, tmp_path / "out.docx", "docx", number_sections=True)
+
+    assert "--number-sections" in captured["args"]
+    assert not any(a.startswith("--reference-doc") for a in captured["args"])
+    assert not any(a.startswith("--lua-filter") for a in captured["args"])

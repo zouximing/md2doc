@@ -40,13 +40,25 @@ def get_version() -> str | None:
     return match.group(1) if match else None
 
 
-def convert(input_path: str | Path, output_path: str | Path, fmt: str) -> None:
+def convert(
+    input_path: str | Path,
+    output_path: str | Path,
+    fmt: str,
+    *,
+    reference_doc: str | Path | None = None,
+    lua_filter: str | Path | None = None,
+    number_sections: bool = False,
+) -> None:
     """调用 pandoc 把 input_path 转为 fmt 格式，输出到 output_path。
 
     Args:
         input_path: 输入 .md 文件路径（Path 或 str）。
         output_path: 输出文件路径（Path 或 str）。
         fmt: 目标格式，如 'docx'、'pdf'、'html'、'epub'。
+        reference_doc: docx 输出时的样式模板路径（对应 pandoc --reference-doc）。
+            None 则不传。
+        lua_filter: Lua filter 文件路径（对应 pandoc --lua-filter）。None 则不传。
+        number_sections: True 时加 --number-sections，给标题自动编号。
 
     Raises:
         PandocNotFoundError: pandoc 未安装。
@@ -61,6 +73,12 @@ def convert(input_path: str | Path, output_path: str | Path, fmt: str) -> None:
         "--from=markdown",
         f"--to={fmt}",
     ]
+    if reference_doc is not None:
+        args.append(f"--reference-doc={reference_doc}")
+    if lua_filter is not None:
+        args.append(f"--lua-filter={lua_filter}")
+    if number_sections:
+        args.append("--number-sections")
     result = subprocess.run(
         args, capture_output=True, text=True, check=False, timeout=120
     )
