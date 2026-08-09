@@ -12,9 +12,7 @@ import sys
 from pathlib import Path
 
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
-from docx.shared import Pt, RGBColor, Twips
 
 OUTPUT = Path(__file__).resolve().parent.parent / "src" / "md2doc" / "templates" / "reference.docx"
 
@@ -107,8 +105,12 @@ def _set_first_line_indent_chars(style_element, chars: int) -> None:
     ind.set(qn("w:firstLineChars"), str(chars * 100))
 
 
-def _set_line_spacing(style_element, lines: float) -> None:
-    """1.5 倍行距 = 360 twips（240 * lines）。"""
+def _set_line_spacing(style_element, lines: float, before_pt: float | None = None, after_pt: float | None = None) -> None:
+    """行距 + 可选段前/段后间距。
+
+    lines=1.5 → line=360 twips, lineRule=auto。
+    before_pt/after_pt 单位为 pt（1pt=20 twips）。
+    """
     pPr = style_element.find(qn("w:pPr"))
     if pPr is None:
         pPr = style_element.makeelement(qn("w:pPr"), {})
@@ -119,18 +121,35 @@ def _set_line_spacing(style_element, lines: float) -> None:
         pPr.append(spc)
     spc.set(qn("w:line"), str(int(240 * lines)))
     spc.set(qn("w:lineRule"), "auto")
+    if before_pt is not None:
+        spc.set(qn("w:before"), str(int(before_pt * 20)))
+    if after_pt is not None:
+        spc.set(qn("w:after"), str(int(after_pt * 20)))
 
 
 def _set_color(style_element, hex_rgb: str) -> None:
     rPr = style_element.find(qn("w:rPr"))
     if rPr is None:
-        rPr = rPr = style_element.makeelement(qn("w:rPr"), {})
+        rPr = style_element.makeelement(qn("w:rPr"), {})
         style_element.append(rPr)
     color = rPr.find(qn("w:color"))
     if color is None:
         color = rPr.makeelement(qn("w:color"), {})
         rPr.append(color)
     color.set(qn("w:val"), hex_rgb)
+
+
+def _set_left_indent(style_element, cm: float) -> None:
+    """左缩进（单位 cm，1cm=567 twips）。"""
+    pPr = style_element.find(qn("w:pPr"))
+    if pPr is None:
+        pPr = style_element.makeelement(qn("w:pPr"), {})
+        style_element.append(pPr)
+    ind = pPr.find(qn("w:ind"))
+    if ind is None:
+        ind = pPr.makeelement(qn("w:ind"), {})
+        pPr.append(ind)
+    ind.set(qn("w:left"), str(int(cm * 567)))
 
 
 def _find_or_create_style(doc, name: str, style_type=1):
@@ -174,21 +193,28 @@ def main() -> int:
         _set_first_line_indent_chars(s.element, 2)
         _set_line_spacing(s.element, 1.5)
 
+    # First Paragraph 额外有段前 9pt
+    first_para = doc.styles["First Paragraph"]
+    _set_line_spacing(first_para.element, 1.5, before_pt=9)
+
     # --- Compact（列表项，无缩进）---
     compact = _find_or_create_style(doc, "Compact")
     _set_east_asia(compact.element, "宋体")
     _set_size(compact.element, 12)
+    _set_line_spacing(compact.element, 1.0, before_pt=3, after_pt=3)
 
     # --- Block Text（引用块）---
     block = _find_or_create_style(doc, "Block Text")
     _set_east_asia(block.element, "宋体")
     _set_size(block.element, 10.5)
+    _set_line_spacing(block.element, 1.0, after_pt=10)
 
     # --- Source Code（代码块）---
     code = _find_or_create_style(doc, "Source Code")
     _set_ascii_font(code.element, "Consolas")
     _set_size(code.element, 10)
     _set_color(code.element, "404040")
+    _set_left_indent(code.element, 0.5)
 
     # --- Image Caption / Table Caption（图/表标题，居中 + 黑体 10.5pt）---
     for name in ("Image Caption", "Table Caption"):

@@ -75,3 +75,25 @@ def test_table_caption_is_centered(doc):
     pPr = s.element.find(qn("w:pPr"))
     jc = pPr.find(qn("w:jc")) if pPr is not None else None
     assert jc is not None and jc.get(qn("w:val")) == "center"
+
+
+def test_source_code_has_left_indent(doc):
+    """Source Code 应有左缩进 0.5cm（≈283 twips）。"""
+    s = doc.styles["Source Code"]
+    pPr = s.element.find(qn("w:pPr"))
+    assert pPr is not None
+    ind = pPr.find(qn("w:ind"))
+    assert ind is not None
+    left = int(ind.get(qn("w:left")))
+    assert 280 <= left <= 286  # 允许 ±3 twips 容差
+
+
+def test_compact_has_before_after_spacing(doc):
+    """Compact 应有段前 3pt + 段后 3pt（各 60 twips）。"""
+    s = doc.styles["Compact"]
+    pPr = s.element.find(qn("w:pPr"))
+    assert pPr is not None
+    spc = pPr.find(qn("w:spacing"))
+    assert spc is not None
+    assert spc.get(qn("w:before")) == "60"
+    assert spc.get(qn("w:after")) == "60"
