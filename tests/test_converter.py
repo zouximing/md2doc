@@ -317,3 +317,30 @@ def test_convert_batch_empty_input_returns_empty_lists(monkeypatch, tmp_path):
     )
     assert successes == []
     assert failures == []
+
+
+# --- strip_heading_numbers ---
+
+@pytest.mark.parametrize(
+    "line,expected",
+    [
+        ("## 1. 基础文本元素", "## 基础文本元素"),
+        ("### 1.1 段落与换行", "### 段落与换行"),
+        ("#### 2.1.1.1 四级标题", "#### 四级标题"),
+        ("# md2doc 全面测试文档", "# md2doc 全面测试文档"),
+        ("## 1 一些章节", "## 一些章节"),
+        ("## 1.2.3. 变长编号", "## 变长编号"),
+        ("## 1.5英寸是多大", "## 1.5英寸是多大"),  #数字后无空格，不剥
+        ("## 第一章 概述", "## 第一章 概述"),
+        ("## 标题（注释）", "## 标题（注释）"),
+        ("普通段落 1. 内容", "普通段落 1. 内容"),  # 非标题不剥
+    ],
+)
+def test_strip_heading_numbers_single_line(line, expected):
+    assert converter.strip_heading_numbers(line) == expected
+
+
+def test_strip_heading_numbers_preserves_other_content():
+    md = "# 标题\n\n## 1.1 章节\n\n普通段落。\n\n### 2.3.4 深层\n"
+    expected = "# 标题\n\n## 章节\n\n普通段落。\n\n### 深层\n"
+    assert converter.strip_heading_numbers(md) == expected

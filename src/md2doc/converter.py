@@ -6,11 +6,33 @@
 
 from __future__ import annotations
 
+import re
 import tempfile
 from pathlib import Path
 
 from md2doc import mermaid, pandoc
 from md2doc.errors import InvalidInputError
+
+_HEADING_NUM_PATTERN = re.compile(
+    r"^(#{1,6})\s+(?:\d+(?:\.\d+)*)\.?\s+(.+)$",
+    re.MULTILINE,
+)
+
+
+def strip_heading_numbers(md: str) -> str:
+    """剥离 Markdown 标题里手写的章节编号。
+
+    仅作用于 ``#`` 开头的标题行，且要求"数字 + 可选小数点 + 空格 + 文本"模式。
+    "## 1. xxx" → "## xxx"，"### 1.2.3 yyy" → "### yyy"。
+    无编号或非"数字."开头的标题不动。
+
+    Args:
+        md: 原始 Markdown 文本。
+
+    Returns:
+        标题编号被剥离后的文本。
+    """
+    return _HEADING_NUM_PATTERN.sub(r"\1 \2", md)
 
 
 def scan_md_files(input_path: Path, recursive: bool = True) -> list[Path]:
