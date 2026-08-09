@@ -70,8 +70,12 @@ def test_number_sections_applied(generated_docx):
     """pandoc --number-sections 应在标题前注入数字。simple.md 中应能找到形如 '1 xxx' 的标题段落。"""
     found = False
     for p in generated_docx.paragraphs:
-        if p.style and p.style.name and p.style.name.startswith("Heading"):
-            if re.match(r"^\d+(\.\d+)*\s", p.text):
-                found = True
-                break
+        if (
+            p.style
+            and p.style.name
+            and p.style.name.startswith("Heading")
+            and re.match(r"^\d+(\.\d+)*\s", p.text)
+        ):
+            found = True
+            break
     assert found, f"未找到自动编号的标题，所有标题文本：{[p.text for p in generated_docx.paragraphs if p.style and p.style.name and p.style.name.startswith('Heading')]}"

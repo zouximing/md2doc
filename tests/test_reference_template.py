@@ -1,5 +1,7 @@
 """验证 reference.docx 模板包含设计要求的全部样式。"""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 import pytest
