@@ -394,14 +394,15 @@ def test_convert_file_unstyled_skips_template_args(tmp_path, monkeypatch):
 
 
 def test_convert_file_styled_non_docx_skips_template_args(tmp_path, monkeypatch):
-    """styled=True 但 fmt != docx 时，pandoc 不收 styled 参数（reference.docx 只对 docx 生效）。"""
+    """styled=True 但 fmt != docx 时，pandoc 不收 styled 参数，且标题编号保留（reference.docx 只对 docx 生效）。"""
     captured = {}
 
     def fake_pandoc_convert(input_path, output_path, fmt, **kwargs):
         captured["kwargs"] = kwargs
+        captured["input_content"] = Path(input_path).read_text(encoding="utf-8")
 
     input_md = tmp_path / "in.md"
-    input_md.write_text("# hi\n", encoding="utf-8")
+    input_md.write_text("## 1.1 章节\n", encoding="utf-8")
 
     monkeypatch.setattr("md2doc.converter.pandoc.convert", fake_pandoc_convert)
     monkeypatch.setattr("md2doc.converter.mermaid.preprocess", lambda md, d: md)
@@ -409,3 +410,5 @@ def test_convert_file_styled_non_docx_skips_template_args(tmp_path, monkeypatch)
     converter.convert_file(input_md, tmp_path / "out.html", "html", no_mermaid=True, styled=True)
 
     assert captured["kwargs"] == {}
+    # 标题编号应保留（仅 docx 才剥离）
+    assert "## 1.1 章节" in captured["input_content"]

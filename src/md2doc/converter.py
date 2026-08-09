@@ -200,12 +200,11 @@ def convert_file(
 
         # 构建 pandoc 调用参数
         kwargs: dict = {}
-        if styled:
+        if styled and fmt == "docx":
             processed = strip_heading_numbers(processed)
-            if fmt == "docx":
-                kwargs["reference_doc"] = _template_path("reference.docx")
-                kwargs["lua_filter"] = _template_path("caption.lua")
-                kwargs["number_sections"] = True
+            kwargs["reference_doc"] = _template_path("reference.docx")
+            kwargs["lua_filter"] = _template_path("caption.lua")
+            kwargs["number_sections"] = True
 
         # 写入临时 .md 文件交给 pandoc
         staged = Path(tmpdir) / "_staged.md"
