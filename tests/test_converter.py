@@ -183,7 +183,7 @@ def test_convert_file_calls_mermaid_and_pandoc(monkeypatch, tmp_path):
         calls["mermaid"] = True
         return md  # 原样返回
 
-    def fake_pandoc_convert(input_path, output_path, fmt):
+    def fake_pandoc_convert(input_path, output_path, fmt, **kwargs):
         calls["pandoc"] = True
         Path(output_path).write_bytes(b"DOCX")
 
@@ -227,7 +227,7 @@ def test_convert_file_writes_intermediate_md_to_tempdir(monkeypatch, tmp_path):
 
     captured_inputs = []
 
-    def fake_pandoc_convert(input_path, output_path, fmt):
+    def fake_pandoc_convert(input_path, output_path, fmt, **kwargs):
         captured_inputs.append(Path(input_path).read_text(encoding="utf-8"))
         Path(output_path).write_bytes(b"DOCX")
 
@@ -262,7 +262,7 @@ def test_convert_batch_returns_success_and_failure_lists(monkeypatch, tmp_path):
 
     call_count = {"n": 0}
 
-    def fake_convert_file(input_file, output_file, fmt, no_mermaid=False):
+    def fake_convert_file(input_file, output_file, fmt, no_mermaid=False, **kwargs):
         call_count["n"] += 1
         # b.md 转换失败
         if input_file.name == "b.md":
@@ -294,7 +294,7 @@ def test_convert_batch_mirrors_output_structure(monkeypatch, tmp_path):
 
     out_dir = tmp_path / "build"
 
-    def fake_convert_file(input_file, output_file, fmt, no_mermaid=False):
+    def fake_convert_file(input_file, output_file, fmt, no_mermaid=False, **kwargs):
         Path(output_file).write_bytes(b"OK")
         return Path(output_file)
 
@@ -344,3 +344,68 @@ def test_strip_heading_numbers_preserves_other_content():
     md = "# 标题\n\n## 1.1 章节\n\n普通段落。\n\n### 2.3.4 深层\n"
     expected = "# 标题\n\n## 章节\n\n普通段落。\n\n### 深层\n"
     assert converter.strip_heading_numbers(md) == expected
+
+
+# --- convert_file / convert_batch 的 styled 参数 ---
+
+def test_convert_file_styled_docx_passes_all_template_args(tmp_path, monkeypatch):
+    """styled=True 且 fmt=docx 时，应调用 pandoc.convert 传入三个参数 + 剥离编号。"""
+    captured = {}
+
+    def fake_pandoc_convert(input_path, output_path, fmt, **kwargs):
+        captured["kwargs"] = kwargs
+        captured["input_content"] = Path(input_path).read_text(encoding="utf-8")
+
+    input_md = tmp_path / "in.md"
+    input_md.write_text("## 1.1 章节\n\n内容\n", encoding="utf-8")
+
+    monkeypatch.setattr("md2doc.converter.pandoc.convert", fake_pandoc_convert)
+    monkeypatch.setattr("md2doc.converter.mermaid.preprocess", lambda md, d: md)
+
+    converter.convert_file(input_md, tmp_path / "out.docx", "docx", no_mermaid=True, styled=True)
+
+    assert captured["kwargs"].get("reference_doc") is not None
+    assert captured["kwargs"].get("lua_filter") is not None
+    assert captured["kwargs"].get("number_sections") is True
+    # 标题编号已被剥离
+    assert "## 章节" in captured["input_content"]
+    assert "## 1.1" not in captured["input_content"]
+
+
+def test_convert_file_unstyled_skips_template_args(tmp_path, monkeypatch):
+    """styled=False 时，pandoc.convert 不应收到任何 styled 参数。"""
+    captured = {}
+
+    def fake_pandoc_convert(input_path, output_path, fmt, **kwargs):
+        captured["kwargs"] = kwargs
+        captured["input_content"] = Path(input_path).read_text(encoding="utf-8")
+
+    input_md = tmp_path / "in.md"
+    input_md.write_text("## 1.1 章节\n", encoding="utf-8")
+
+    monkeypatch.setattr("md2doc.converter.pandoc.convert", fake_pandoc_convert)
+    monkeypatch.setattr("md2doc.converter.mermaid.preprocess", lambda md, d: md)
+
+    converter.convert_file(input_md, tmp_path / "out.docx", "docx", no_mermaid=True, styled=False)
+
+    assert captured["kwargs"] == {}
+    # 标题编号未剥离
+    assert "## 1.1 章节" in captured["input_content"]
+
+
+def test_convert_file_styled_non_docx_skips_template_args(tmp_path, monkeypatch):
+    """styled=True 但 fmt != docx 时，pandoc 不收 styled 参数（reference.docx 只对 docx 生效）。"""
+    captured = {}
+
+    def fake_pandoc_convert(input_path, output_path, fmt, **kwargs):
+        captured["kwargs"] = kwargs
+
+    input_md = tmp_path / "in.md"
+    input_md.write_text("# hi\n", encoding="utf-8")
+
+    monkeypatch.setattr("md2doc.converter.pandoc.convert", fake_pandoc_convert)
+    monkeypatch.setattr("md2doc.converter.mermaid.preprocess", lambda md, d: md)
+
+    converter.convert_file(input_md, tmp_path / "out.html", "html", no_mermaid=True, styled=True)
+
+    assert captured["kwargs"] == {}

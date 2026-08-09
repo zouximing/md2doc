@@ -35,6 +35,11 @@ def strip_heading_numbers(md: str) -> str:
     return _HEADING_NUM_PATTERN.sub(r"\1 \2", md)
 
 
+def _template_path(name: str) -> Path:
+    """返回包内 templates 目录下指定资源的路径。"""
+    return Path(__file__).parent / "templates" / name
+
+
 def scan_md_files(input_path: Path, recursive: bool = True) -> list[Path]:
     """收集输入路径下的所有 .md 文件（大小写不敏感扩展名）。
 
@@ -161,16 +166,20 @@ def convert_file(
     output_file: Path,
     fmt: str,
     no_mermaid: bool = False,
+    styled: bool = True,
 ) -> Path:
     """转换单个 .md 文件到目标格式。
 
-    流程：读源 MD -> mermaid 预处理（除非 no_mermaid）-> 写临时 .md -> pandoc 转换 -> 输出。
+    流程：读源 MD -> mermaid 预处理（除非 no_mermaid）-> 可选剥离标题编号
+        -> 写临时 .md -> pandoc 转换 -> 输出。
 
     Args:
         input_file: 输入 .md 文件路径。
         output_file: 输出文件路径。
         fmt: 目标格式（如 'docx'）。
         no_mermaid: True 则跳过 mermaid 预处理。
+        styled: True 且 fmt=docx 时启用 reference.docx 样式模板、caption.lua
+            图表编号、--number-sections 标题自动编号。False 则完全使用 pandoc 默认输出。
 
     Returns:
         输出文件路径。
@@ -189,10 +198,19 @@ def convert_file(
         else:
             processed = mermaid.preprocess(md, Path(tmpdir))
 
+        # 构建 pandoc 调用参数
+        kwargs: dict = {}
+        if styled:
+            processed = strip_heading_numbers(processed)
+            if fmt == "docx":
+                kwargs["reference_doc"] = _template_path("reference.docx")
+                kwargs["lua_filter"] = _template_path("caption.lua")
+                kwargs["number_sections"] = True
+
         # 写入临时 .md 文件交给 pandoc
         staged = Path(tmpdir) / "_staged.md"
         staged.write_text(processed, encoding="utf-8")
-        pandoc.convert(staged, output_file, fmt)
+        pandoc.convert(staged, output_file, fmt, **kwargs)
 
     return Path(output_file)
 
@@ -203,6 +221,7 @@ def convert_batch(
     fmt: str,
     base_input_dir: Path,
     no_mermaid: bool = False,
+    styled: bool = True,
 ) -> tuple[list[Path], list[tuple[Path, Exception]]]:
     """批量转换多个 .md 文件。
 
@@ -230,7 +249,8 @@ def convert_batch(
                 is_batch=True, base_input_dir=base_input_dir,
             )
             actual_output = convert_file(
-                input_file, output_file, fmt, no_mermaid=no_mermaid
+                input_file, output_file, fmt,
+                no_mermaid=no_mermaid, styled=styled,
             )
             successes.append(actual_output)
         except Exception as exc:  # noqa: BLE001 - 批量模式需捕获一切以继续
