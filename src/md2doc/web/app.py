@@ -7,11 +7,17 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import mimetypes
 import tempfile
 from pathlib import Path
 from typing import Callable
 
 import uvicorn
+
+# Windows 注册表常把 .js 注册为 text/plain，导致 FastAPI StaticFiles 返回
+# 错误 MIME，浏览器拒绝执行 ESM 模块。这里在导入时强制纠正。
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("application/javascript", ".mjs")
 from fastapi import FastAPI, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles

@@ -1,8 +1,8 @@
-import { EditorState } from "https://esm.sh/codemirror@6.65.7";
-import { EditorView, keymap } from "https://esm.sh/@codemirror/view@6.65.7";
-import { defaultKeymap, history, historyKeymap } from "https://esm.sh/@codemirror/commands@6.2.2";
-import { markdown, markdownLanguage } from "https://esm.sh/@codemirror/lang-markdown@6.1.0";
-import { languages } from "https://esm.sh/@codemirror/language-data@6.3.1";
+import { EditorState } from "https://esm.sh/@codemirror/state@^6.0.0";
+import { EditorView, keymap } from "https://esm.sh/@codemirror/view@^6.0.0";
+import { defaultKeymap, history, historyKeymap } from "https://esm.sh/@codemirror/commands@^6.0.0";
+import { markdown, markdownLanguage } from "https://esm.sh/@codemirror/lang-markdown@^6.0.0";
+import { languages } from "https://esm.sh/@codemirror/language-data@^6.0.0";
 
 const SAMPLE = `# 标题
 
