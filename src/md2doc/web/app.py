@@ -142,7 +142,9 @@ def main() -> None:
     """md2doc-web CLI 入口：启动 uvicorn 服务。"""
     parser = argparse.ArgumentParser(prog="md2doc-web")
     parser.add_argument(
-        "--host", default="127.0.0.1", help="监听地址（默认仅本机访问）"
+        "--host",
+        default="0.0.0.0",
+        help="监听地址（默认 0.0.0.0，允许内网其他主机访问；设为 127.0.0.1 仅本机）",
     )
     parser.add_argument("--port", type=int, default=8000, help="监听端口")
     parser.add_argument("--reload", action="store_true", help="代码热重载（开发用）")

@@ -64,15 +64,17 @@ md2doc input.md --no-mermaid
 
 ## Mermaid 支持
 
-在 Markdown 中用 ` ```mermaid ` 代码块写图：
+在 Markdown 中用 ` ```mermaid ` 代码块写图（围栏必须顶格，前面不能有空格）。下面就是一个真实的 mermaid 块，GitHub 和 md2doc 都会把它渲染成图：
 
-    ```mermaid
-    sequenceDiagram
-        Alice->>Bob: Hello
-        Bob-->>Alice: Hi
-    ```
+```mermaid
+sequenceDiagram
+    Alice->>Bob: Hello
+    Bob-->>Alice: Hi
+```
 
 md2doc 会自动把所有 mermaid 块渲染为 PNG 并嵌入输出文档。
+
+> 注意：mermaid 围栏必须**顶格**（前面无空格、无外层围栏包裹）。若有 4 个或更多空格缩进，Markdown 会把整段当作"缩进代码块"字面文本；若被外层围栏（4+ 反引号）包裹，md2doc 替换后的图片引用会被困在外层围栏内，pandoc 会把它当代码字面文本而不嵌入图。
 
 ## 常见问题
 
@@ -90,14 +92,18 @@ md2doc 还提供 Web 界面，支持浏览器上传 / 在线编辑 / 实时预�
 
 ```bash
 pip install -e ".[web]"        # 安装 FastAPI/uvicorn 等额外依赖
-md2doc-web                      # 默认监听 127.0.0.1:8000（仅本机访问）
-# 暴露到内网（多人共用）：
-md2doc-web --host 0.0.0.0 --port 8000
-# 或自定义端口：
-md2doc-web --host 127.0.0.1 --port 9000
+md2doc-web                      # 默认监听 0.0.0.0:8000（允许内网访问）
+# 仅本机访问：
+md2doc-web --host 127.0.0.1
+# 自定义端口：
+md2doc-web --port 9000
 ```
 
-打开浏览器访问 `http://localhost:8000`。
+本机访问 `http://localhost:8000`，内网同事访问 `http://<本机IP>:8000`。
+
+> Linux 服务器部署给多人共用，参考 [docs/deployment-linux.md](docs/deployment-linux.md)。
+
+> **安全提示**：默认监听 `0.0.0.0` 会暴露在所有网卡上，md2doc-web 无鉴权，请确保仅在可信内网使用，或在反向代理层加访问控制。
 
 ### 使用
 
