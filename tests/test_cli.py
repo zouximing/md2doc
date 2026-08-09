@@ -4,6 +4,7 @@ import pytest
 from click.testing import CliRunner
 
 from md2doc import cli
+from md2doc.cli import main
 
 
 @pytest.fixture
@@ -39,7 +40,7 @@ def test_single_file_conversion_success(runner, tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "md2doc.cli.converter.convert_file",
-        lambda inp, outp, fmt, no_mermaid=False: Path(outp).write_bytes(b"DOCX"),
+        lambda inp, outp, fmt, **kwargs: Path(outp).write_bytes(b"DOCX"),
     )
 
     result = runner.invoke(cli.main, [str(src)])
@@ -53,7 +54,7 @@ def test_single_file_with_explicit_output(runner, tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "md2doc.cli.converter.convert_file",
-        lambda inp, outp, fmt, no_mermaid=False: Path(outp).write_bytes(b"DOCX"),
+        lambda inp, outp, fmt, **kwargs: Path(outp).write_bytes(b"DOCX"),
     )
 
     out = tmp_path / "report.docx"
@@ -112,7 +113,7 @@ def test_batch_success_continues_on_failure(runner, tmp_path, monkeypatch):
 
     out_dir = tmp_path / "build"
 
-    def fake_convert_file(inp, outp, fmt, no_mermaid=False):
+    def fake_convert_file(inp, outp, fmt, **kwargs):
         from md2doc.errors import ConversionError
         if inp.name == "b.md":
             raise ConversionError("b 失败")
@@ -175,3 +176,43 @@ def test_end_to_end_with_mermaid(runner, tmp_path):
     assert result.exit_code == 0
     assert out.exists()
     assert out.stat().st_size > 0
+
+
+def test_no_style_flag_disables_styling(tmp_path, monkeypatch):
+    """--no-style 时 convert_file 应当收到 styled=False。"""
+    captured = {}
+
+    def fake_convert_file(input_file, output_file, fmt, **kwargs):
+        captured["styled"] = kwargs.get("styled", True)
+        Path(output_file).write_bytes(b"")
+        return Path(output_file)
+
+    monkeypatch.setattr("md2doc.cli.converter.convert_file", fake_convert_file)
+    runner = CliRunner()
+    src = tmp_path / "a.md"
+    src.write_text("# a", encoding="utf-8")
+
+    result = runner.invoke(main, [str(src), "-o", str(tmp_path / "out.docx"), "--no-style"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["styled"] is False
+
+
+def test_default_invocation_enables_styling(tmp_path, monkeypatch):
+    """不带 --no-style 时 convert_file 应当收到 styled=True。"""
+    captured = {}
+
+    def fake_convert_file(input_file, output_file, fmt, **kwargs):
+        captured["styled"] = kwargs.get("styled", True)
+        Path(output_file).write_bytes(b"")
+        return Path(output_file)
+
+    monkeypatch.setattr("md2doc.cli.converter.convert_file", fake_convert_file)
+    runner = CliRunner()
+    src = tmp_path / "a.md"
+    src.write_text("# a", encoding="utf-8")
+
+    result = runner.invoke(main, [str(src), "-o", str(tmp_path / "out.docx")])
+
+    assert result.exit_code == 0, result.output
+    assert captured["styled"] is True

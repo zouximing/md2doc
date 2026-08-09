@@ -39,8 +39,9 @@ def _print_version():
 @click.option("-t", "--format", "fmt", default="docx", help="输出格式（docx/pdf/html/epub/...）")
 @click.option("--recursive/--no-recursive", "-r", default=True, help="目录输入时是否递归子目录")
 @click.option("--no-mermaid", is_flag=True, default=False, help="跳过 mermaid 预处理")
+@click.option("--no-style", is_flag=True, default=False, help="不应用 docx 样式模板（reference.docx + 自动编号 + caption），使用 pandoc 默认输出")
 @click.option("-V", "--version", "show_version", is_flag=True, default=False, help="显示版本号与依赖版本")
-def main(input, output, fmt, recursive, no_mermaid, show_version):
+def main(input, output, fmt, recursive, no_mermaid, no_style, show_version):
     """把 INPUT (.md 文件或目录) 转换为目标格式。"""
     if show_version:
         _print_version()
@@ -64,9 +65,9 @@ def main(input, output, fmt, recursive, no_mermaid, show_version):
 
     try:
         if not is_batch:
-            _convert_single(input_path, output, fmt, no_mermaid)
+            _convert_single(input_path, output, fmt, no_mermaid, no_style)
         else:
-            _convert_directory(input_path, output, fmt, recursive, no_mermaid)
+            _convert_directory(input_path, output, fmt, recursive, no_mermaid, no_style)
     except DependencyNotFoundError as exc:
         _console.print(f"[red]✗ {exc}[/red]")
         raise SystemExit(exc.exit_code)
@@ -78,15 +79,18 @@ def main(input, output, fmt, recursive, no_mermaid, show_version):
         raise SystemExit(4)
 
 
-def _convert_single(input_path, output, fmt, no_mermaid):
+def _convert_single(input_path, output, fmt, no_mermaid, no_style):
     output_file = converter.resolve_output_path(
         input_path, Path(output) if output else None, fmt, is_batch=False
     )
-    converter.convert_file(input_path, output_file, fmt, no_mermaid=no_mermaid)
+    converter.convert_file(
+        input_path, output_file, fmt,
+        no_mermaid=no_mermaid, styled=not no_style,
+    )
     _console.print(f"[green]✓[/green] {input_path} → {output_file}")
 
 
-def _convert_directory(input_path, output, fmt, recursive, no_mermaid):
+def _convert_directory(input_path, output, fmt, recursive, no_mermaid, no_style):
     output_dir = Path(output)
     files = converter.scan_md_files(input_path, recursive=recursive)
     if not files:
@@ -94,7 +98,8 @@ def _convert_directory(input_path, output, fmt, recursive, no_mermaid):
         return
 
     successes, failures = converter.convert_batch(
-        files, output_dir, fmt, base_input_dir=input_path, no_mermaid=no_mermaid
+        files, output_dir, fmt, base_input_dir=input_path,
+        no_mermaid=no_mermaid, styled=not no_style,
     )
     for s in successes:
         _console.print(f"[green]✓[/green] {s}")
