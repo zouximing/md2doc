@@ -370,7 +370,46 @@ sudo apt install -y fonts-noto-cjk fonts-wqy-zenhei   # Ubuntu
 sudo yum install -y wqy-zenhei-cjk-fonts               # CentOS
 ```
 
-### 11.3 同事浏览器打不开
+### 11.3 mermaid 渲染失败：`ERR_FILE_NOT_FOUND`（dist/index.html）
+
+**典型症状**：手动 `mmdc -i test.mmd -o test.png` 正常，通过 web 服务调用报此错。
+
+**根因**：mmdc 渲染时会让无头浏览器加载自己安装目录下的 `dist/index.html`。若浏览器是 **snap 版 Chromium**（Ubuntu 20.04+ 的 `/usr/bin/chromium-browser` 默认是 snap 包装脚本），其沙箱**看不到 `/usr/lib/node_modules` 等路径**，于是真实存在的文件在浏览器视角里"不存在"。手动跑没问题，是因为登录 shell 没设 `PUPPETEER_EXECUTABLE_PATH`，mmdc 用的是 puppeteer 自带的非 snap Chromium；而 web 服务（systemd 单元或 md2doc 代码自动探测）注入了 snap 路径。
+
+定位（确认是 snap）：
+
+```bash
+# 1) chromium-browser 是不是 snap 包装脚本（输出指向 /snap/... 即是）
+readlink -f /usr/bin/chromium-browser
+
+# 2) 手动复现：注入同样变量跑 mmdc —— 预期报出一模一样的错
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+  mmdc -i /tmp/test.mmd -o /tmp/test.png
+```
+
+修复（任选其一，按优先级排序）：
+
+```bash
+# 方案 A（推荐）：装非 snap 的 Chrome，并让服务指过去
+# Ubuntu:
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | \
+  sudo tee /etc/apt/sources.list.d/google-chrome.list
+sudo apt update && sudo apt install -y google-chrome-stable
+# systemd 单元里改为：Environment="PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable"
+
+# 方案 B：不指定浏览器，用 puppeteer 自带 Chromium（手动跑已验证可用）
+# 删掉 systemd 单元中的 PUPPETEER_EXECUTABLE_PATH 行；
+# 同时确认 md2doc ≥ 本版本（代码已自动跳过 snap 浏览器）
+
+# 改完任意方案后重启
+sudo systemctl daemon-reload && sudo systemctl restart md2doc-web
+```
+
+> 代码侧已修复（`src/md2doc/mermaid.py`）：Linux 上自动探测 Chrome 时会跳过
+> `/snap/bin` 及指向 snap 的包装脚本，避免误注入。服务器需 `git pull` 更新代码。
+
+### 11.4 同事浏览器打不开
 
 按顺序排查：
 1. 服务器进程在跑：`systemctl status md2doc-web`
@@ -378,11 +417,11 @@ sudo yum install -y wqy-zenhei-cjk-fonts               # CentOS
 3. 防火墙放行：`sudo firewall-cmd --list-ports` 或 `sudo ufw status`
 4. IP 正确：让同事 `ping <服务器IP>` 看是否通
 
-### 11.4 大文件转换超时
+### 11.5 大文件转换超时
 
 默认 Nginx 60s 超时。把 `proxy_read_timeout` 调到 300s（已在上方配置中给出）。
 
-### 11.5 上传报 413
+### 11.6 上传报 413
 
 Nginx 默认 `client_max_body_size` 是 1MB。已在示例中设为 20M，若仍报错按需调大。
 

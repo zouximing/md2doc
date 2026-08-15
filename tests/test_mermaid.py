@@ -360,3 +360,45 @@ def test_render_all_env_none_when_no_chrome(monkeypatch, tmp_path):
     mermaid.render_all(blocks, tmp_path)
 
     assert captured_envs[0] is None
+
+
+# --- Linux snap Chromium 排除（snap 沙箱看不到 mmdc 安装目录） ---
+
+
+def test_linux_candidates_exclude_snap_paths():
+    """Linux 候选列表不含 /snap/bin 下的浏览器。"""
+    candidates = mermaid._linux_chrome_candidates()
+    assert all(not p.startswith("/snap/") for p in candidates)
+
+
+def test_find_system_chrome_skips_snap_chromium(monkeypatch, tmp_path):
+    """snap 版 chromium-browser 不应被选中（沙箱内看不到 mmdc 安装目录）。
+
+    场景：Ubuntu 20.04+ 的 /usr/bin/chromium-browser 是指向 snap 的包装脚本。
+    """
+    fake_snap_wrapper = tmp_path / "chromium-browser"
+    fake_snap_wrapper.write_text(
+        "#!/bin/sh\nexec /snap/chromium/current/usr/lib/chromium-browser/chrome \"$@\"\n"
+    )
+    monkeypatch.setattr("md2doc.mermaid.sys.platform", "linux")
+    monkeypatch.setattr(
+        "md2doc.mermaid._linux_chrome_candidates",
+        lambda: [str(fake_snap_wrapper)],
+    )
+    assert mermaid._find_system_chrome() is None
+
+
+def test_find_system_chrome_prefers_real_binary_over_snap_wrapper(monkeypatch, tmp_path):
+    """真实二进制与 snap 包装器并存时，优先选真实二进制。"""
+    fake_snap_wrapper = tmp_path / "chromium-browser"
+    fake_snap_wrapper.write_text(
+        "#!/bin/sh\nexec /snap/chromium/current/usr/lib/chromium-browser/chrome \"$@\"\n"
+    )
+    fake_real = tmp_path / "chromium"
+    fake_real.write_bytes(b"ELF")
+    monkeypatch.setattr("md2doc.mermaid.sys.platform", "linux")
+    monkeypatch.setattr(
+        "md2doc.mermaid._linux_chrome_candidates",
+        lambda: [str(fake_snap_wrapper), str(fake_real)],
+    )
+    assert mermaid._find_system_chrome() == str(fake_real)

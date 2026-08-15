@@ -114,31 +114,60 @@ _CHROME_PATHS: dict[str, list[str]] = {
 
 
 def _linux_chrome_candidates() -> list[str]:
-    """Linux 上 Chrome/Chromium 常见路径。"""
+    """Linux 上 Chrome/Chromium 常见路径。
+
+    不含 /snap/bin 下的浏览器：snap 沙箱看不到 mmdc 安装目录
+    （/usr/lib/node_modules/...），会导致 mmdc 报
+    ERR_FILE_NOT_FOUND（dist/index.html）。
+    """
     return [
         "/usr/bin/google-chrome",
         "/usr/bin/google-chrome-stable",
         "/usr/bin/chromium",
         "/usr/bin/chromium-browser",
-        "/snap/bin/chromium",
     ]
+
+
+def _is_snap_chromium(path: str) -> bool:
+    """判断一个浏览器路径是否指向 snap 版 Chromium。
+
+    Ubuntu 20.04+ 的 /usr/bin/chromium-browser 是个 shell 包装脚本，
+    实际执行 /snap/... 下的沙箱化 Chromium。包装脚本内容形如：
+        #!/bin/sh
+        exec /snap/chromium/.../chrome "$@"
+    """
+    try:
+        content = Path(path).read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+    return "/snap/" in content
 
 
 def _find_system_chrome() -> str | None:
     """查找系统已安装的 Chrome/Chromium 可执行文件路径。
+
+    Linux 上跳过 snap 版（含指向 snap 的包装脚本）：其沙箱无法读取
+    mmdc 安装目录，会导致渲染失败。
 
     Returns:
         找到的可执行文件绝对路径；找不到返回 None。
     """
     if sys.platform == "win32":
         candidates: list[str] = list(_CHROME_PATHS.get("win32", []))
+        check_snap = False
     elif sys.platform == "darwin":
         candidates = list(_CHROME_PATHS.get("darwin", []))
+        check_snap = False
     else:
         candidates = _linux_chrome_candidates()
+        check_snap = True
     for path in candidates:
-        if Path(path).is_file():
-            return path
+        if not Path(path).is_file():
+            continue
+        # 仅 Linux 需要读内容排除 snap 包装脚本，避免在 Windows 上白读几 MB 的 chrome.exe
+        if check_snap and _is_snap_chromium(path):
+            continue
+        return path
     return None
 
 
